@@ -217,7 +217,7 @@ PYBIND11_MODULE(py3dti, m)
              }
          })
         .def("process_anechoic", [](CSingleSourceDSP& self, const py::array_t<float>& buffer) {
-            const CMonoBuffer<float> inputBuffer{buffer.data(), buffer.data()+buffer.size()};
+            const std::span<const float> inputBuffer(buffer.data(), buffer.size());
             self.SetBuffer(inputBuffer);
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
