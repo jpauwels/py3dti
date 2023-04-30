@@ -257,14 +257,20 @@ PYBIND11_MODULE(py3dti, m)
         .def("add_listener", &CCore::CreateListener, "head_radius"_a =  0.0875)
         .def_property_readonly("listener", &CCore::GetListener)
         .def("add_source", &CCore::CreateSingleSourceDSP)
+        .def_property_readonly("sources", &CCore::GetSources)
         .def("add_environment", &CCore::CreateEnvironment)
+        .def_property_readonly("environments", &CCore::GetEnvironments)
         .def("__repr__", [](const CCore& self) {
             std::ostringstream oss;
             TAudioStateStruct audioState = self.GetAudioState();
+            size_t numEnvironments = self.GetEnvironments().size();
+            size_t numSources = self.GetSources().size();
             oss << "<py3dti.BinauralRenderer (" << &self << ") with buffer size "
-            << audioState.bufferSize << ", sample rate " << audioState.sampleRate
-            << "Hz and " << (self.GetListener() == nullptr ? "no" : "a")
-            << " listener>" << std::endl;
+            << audioState.bufferSize << ", sample rate " << audioState.sampleRate << "Hz, "
+            << (self.GetListener() == nullptr ? "no" : "a") << " listener, "
+            << numEnvironments << " environment" << (numEnvironments == 1 ? "" : "s")
+            << " and " << numSources << " source" << (numSources == 1 ? "" : "s")
+            << ">" << std::endl;
             return oss.str();
         })
     ;
