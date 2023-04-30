@@ -1,7 +1,9 @@
 #include <sstream>
 #include <filesystem>
 #include <tuple>
+#include <map>
 #include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 #include "pybind11/numpy.h"
 #include "pybind11/stl/filesystem.h"
 #include "BinauralSpatializer/3DTI_BinauralSpatializer.h"
@@ -22,6 +24,7 @@ using namespace Binaural;
 
 typedef std::tuple<float,float,float> Position;
 typedef std::tuple<float,float,float,float> Orientation;
+typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const py::array_t<float>> SourceSamplesMap;
 
 PYBIND11_MODULE(py3dti, m)
 {
@@ -289,6 +292,47 @@ PYBIND11_MODULE(py3dti, m)
         .def_property_readonly("sources", &CCore::GetSources)
         .def("add_environment", &CCore::CreateEnvironment)
         .def_property_readonly("environments", &CCore::GetEnvironments)
+        .def("render_offline", [](const CCore& self, const SourceSamplesMap& samplesMap) {
+            std::vector<py::ssize_t> sourceLengths;
+            for (const auto& kv : samplesMap) {
+                sourceLengths.push_back(kv.second.size());
+            }
+            const py::ssize_t binauralLength = *std::max_element(sourceLengths.begin(), sourceLengths.end());
+            py::array_t<float, py::array::f_style> binauralSamples({binauralLength, py::ssize_t(2)});
+            binauralSamples[py::ellipsis()] = 0.f;
+            const int bufferSize = self.GetAudioState().bufferSize;
+            CMonoBuffer<float> inputBuffer(bufferSize);
+            CMonoBuffer<float> leftBuffer(bufferSize);
+            CMonoBuffer<float> rightBuffer(bufferSize);
+            auto binauralMem = binauralSamples.mutable_unchecked<2>();
+            py::ssize_t start = 0;
+            // Helper function for adding output buffers to contents of stereo file
+            auto addToOutput = [&start, &leftBuffer, &rightBuffer, &binauralMem](const py::ssize_t size) {
+                std::transform(leftBuffer.begin(), leftBuffer.begin()+size, binauralMem.mutable_data(start, 0), binauralMem.mutable_data(start, 0), std::plus<float>());
+                std::transform(rightBuffer.begin(), rightBuffer.begin()+size, binauralMem.mutable_data(start, 1), binauralMem.mutable_data(start, 1), std::plus<float>());
+            };
+            for (; start < binauralLength; start += bufferSize) {
+                const py::ssize_t blockEnd = std::min(start + bufferSize, binauralLength);
+                for (const auto& [source, samples] : samplesMap) {
+                    if (start < samples.size()) {
+                        const py::ssize_t sourceEnd = std::min(blockEnd, samples.size());
+                        const py::ssize_t sourceSize = sourceEnd - start;
+                        const auto samplesMemory = samples.unchecked<1>();
+                        std::copy(samplesMemory.data(start), samplesMemory.data(sourceEnd), inputBuffer.begin());
+                        std::fill(inputBuffer.begin()+sourceSize, inputBuffer.end(), 0.f);
+                        source->SetBuffer(inputBuffer);
+                        source->ProcessAnechoic(leftBuffer, rightBuffer);
+                        addToOutput(sourceSize);
+                    }
+                }
+                const py::ssize_t blockSize = blockEnd - start;
+                for (const auto& environment : self.GetEnvironments()) {
+                    environment->ProcessVirtualAmbisonicReverb(leftBuffer, rightBuffer);
+                    addToOutput(blockSize);
+                }
+            }
+            return binauralSamples;
+        }, "source_samples_map"_a)
         .def("__repr__", [](const CCore& self) {
             std::ostringstream oss;
             TAudioStateStruct audioState = self.GetAudioState();
