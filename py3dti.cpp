@@ -254,9 +254,38 @@ PYBIND11_MODULE(py3dti, m)
             self.SetAudioState(audioState);
         })
         .def_property("resampled_angular_resolution", &CCore::GetHRTFResamplingStep, &CCore::SetHRTFResamplingStep)
-        .def("add_listener", &CCore::CreateListener, "head_radius"_a =  0.0875)
+        .def("add_listener", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const float headRadius) {
+            if (self.GetListener() != nullptr) {
+                throw std::runtime_error("BinauralRenderer already has a listener. Remove the previous one first.");
+            }
+            std::shared_ptr<CListener> listener = self.CreateListener(headRadius);
+            if (position || orientation) {
+                CTransform transform = listener->GetListenerTransform();
+                if (position) {
+                    transform.SetPosition(CVector3(std::get<0>(*position), std::get<1>(*position), std::get<2>(*position)));
+                }
+                if (orientation) {
+                    transform.SetOrientation(CQuaternion(std::get<0>(*orientation), std::get<1>(*orientation), std::get<2>(*orientation), std::get<3>(*orientation)));
+                }
+                listener->SetListenerTransform(transform);
+            }
+            return listener;
+        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a =  0.0875)
         .def_property_readonly("listener", &CCore::GetListener)
-        .def("add_source", &CCore::CreateSingleSourceDSP)
+        .def("add_source", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation) {
+            std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
+            if (position || orientation) {
+                CTransform transform = source->GetCurrentSourceTransform();
+                if (position) {
+                    transform.SetPosition(CVector3(std::get<0>(*position), std::get<1>(*position), std::get<2>(*position)));
+                }
+                if (orientation) {
+                    transform.SetOrientation(CQuaternion(std::get<0>(*orientation), std::get<1>(*orientation), std::get<2>(*orientation), std::get<3>(*orientation)));
+                }
+                source->SetSourceTransform(transform);
+            }
+            return source;
+        }, "position"_a = py::none(), "orientation"_a = py::none())
         .def_property_readonly("sources", &CCore::GetSources)
         .def("add_environment", &CCore::CreateEnvironment)
         .def_property_readonly("environments", &CCore::GetEnvironments)
