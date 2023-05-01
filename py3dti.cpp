@@ -258,7 +258,7 @@ PYBIND11_MODULE(py3dti, m)
             if (self.GetListener() != nullptr) {
                 throw std::runtime_error("BinauralRenderer already has a listener. Remove the previous one first.");
             }
-            shared_ptr<CListener> listener = self.CreateListener(headRadius);
+            std::shared_ptr<CListener> listener = self.CreateListener(headRadius);
             if (position || orientation) {
                 CTransform transform = listener->GetListenerTransform();
                 if (position) {
@@ -273,7 +273,7 @@ PYBIND11_MODULE(py3dti, m)
         }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a =  0.0875)
         .def_property_readonly("listener", &CCore::GetListener)
         .def("add_source", [](CCore& self, const std::optional<const std::tuple<float,float,float>> position, const std::optional<const std::tuple<float,float,float,float>> orientation) {
-            shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
+            std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
             if (position || orientation) {
                 CTransform transform = source->GetCurrentSourceTransform();
                 if (position) {
@@ -294,8 +294,8 @@ PYBIND11_MODULE(py3dti, m)
             for (const auto& kv : sampleMap) {
                 sourceLengths.push_back(kv.second.size());
             }
-            const py::ssize_t binauralLength = *max_element(sourceLengths.begin(), sourceLengths.end());
-            py::array_t<float, py::array::f_style> binauralSamples(py::array::ShapeContainer{binauralLength, py::ssize_t(2)});
+            const py::ssize_t binauralLength = *std::max_element(sourceLengths.begin(), sourceLengths.end());
+            py::array_t<float, py::array::f_style> binauralSamples({binauralLength, py::ssize_t(2)});
             binauralSamples[py::ellipsis()] = 0.f;
             const int bufferSize = self.GetAudioState().bufferSize;
             CMonoBuffer<float> inputBuffer(bufferSize);
