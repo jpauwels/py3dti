@@ -10,7 +10,6 @@ include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManage
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/boost_circular_buffer")
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/cereal/include")
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/src")
-include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/dependencies/include")
 
 set(SOFA_SOURCES
 3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/src/SOFAAPI.cpp
@@ -65,21 +64,79 @@ set(SOFA_SOURCES
 3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/dependencies/include/ncVlenType.cpp
 )
 
+set(DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/dependencies")
+
 if(WIN32)
+	add_library(Hdf5 SHARED IMPORTED)
+	add_library(Hdf5_HL SHARED IMPORTED)
+	add_library(NetCdf SHARED IMPORTED)
+	add_library(Curl SHARED IMPORTED)
+	add_library(ZLib SHARED IMPORTED)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
          set(SUFFIX "_x64")
+         set(SUBDIR "x64")
+    else()
+        set(SUBDIR "i386")
     endif()
-    set(PLATFORM "win")
-    link_libraries(libcurl_imp${SUFFIX} libhdf5${SUFFIX} libhdf5_hl${SUFFIX} netcdf${SUFFIX} zlib${SUFFIX})
+    set_target_properties(Hdf5 PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/win/${SUBDIR}/hdf5.dll"
+		IMPORTED_IMPLIB "${DEPENDENCIES_DIR}/lib/win/libhdf5${SUFFIX}.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(Hdf5_HL PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/win/${SUBDIR}/hdf5_hl.dll"
+		IMPORTED_IMPLIB "${DEPENDENCIES_DIR}/lib/win/libhdf5_hl${SUFFIX}.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(NetCdf PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/win/${SUBDIR}/netcdf.dll"
+		IMPORTED_IMPLIB "${DEPENDENCIES_DIR}/lib/win/netcdf${SUFFIX}.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(Curl PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/win/${SUBDIR}/libcurl.dll"
+		IMPORTED_IMPLIB "${DEPENDENCIES_DIR}/lib/win/libcurl_imp${SUFFIX}.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(ZLib PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/win/${SUBDIR}/zlib1.dll"
+		IMPORTED_IMPLIB "${DEPENDENCIES_DIR}/lib/win/zlib${SUFFIX}.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+	link_libraries(winmm.lib)
 else()
+	add_library(Hdf5 STATIC IMPORTED)
+	add_library(Hdf5_HL STATIC IMPORTED)
+	add_library(NetCdf STATIC IMPORTED)
+	add_library(Curl STATIC IMPORTED)
+	add_library(ZLib STATIC IMPORTED)
     if(APPLE)
         set(PLATFORM "macos")
     else()
         set(PLATFORM "linux")
     endif()
-    link_libraries(curl hdf5 hdf5_hl netcdf z)
+    set_target_properties(Hdf5 PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/${PLATFORM}/libhdf5.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(Hdf5_HL PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/${PLATFORM}/libhdf5_hl.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(NetCdf PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/${PLATFORM}/libnetcdf.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(Curl PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/${PLATFORM}/libcurl.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
+    set_target_properties(ZLib PROPERTIES
+		IMPORTED_LOCATION "${DEPENDENCIES_DIR}/lib/${PLATFORM}/libz.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
+	)
 endif()
-link_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/dependencies/lib/${PLATFORM}")
+link_libraries(Hdf5 Hdf5_HL NetCdf Curl ZLib)
 
 file(GLOB_RECURSE SOURCES
 3dti_AudioToolkit/3dti_Toolkit/BinauralSpatializer/*.cpp
