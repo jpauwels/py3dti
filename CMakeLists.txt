@@ -79,7 +79,7 @@ else()
     else()
         set(PLATFORM "linux")
     endif()
-    link_libraries(curl hdf5 hdf5_hl netcdf netcdf_c++4 z)
+    link_libraries(curl hdf5 hdf5_hl netcdf z)
 endif()
 link_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/dependencies/lib/${PLATFORM}")
 
