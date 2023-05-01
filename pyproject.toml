@@ -29,6 +29,7 @@ test = ["pytest"]
 
 
 [tool.scikit-build]
+sdist.exclude = ["docs", "resources", "3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/lib"]
 wheel.expand-macos-universal-tags = true
 
 
@@ -38,3 +39,16 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = ["error"]
 testpaths = ["tests"]
+
+
+[tool.cibuildwheel]
+build-verbosity = 1
+skip = "*musllinux*"
+test-command = "pytest {project}/tests"
+test-extras = ["test"]
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64"]
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
