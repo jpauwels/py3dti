@@ -110,8 +110,8 @@ PYBIND11_MODULE(py3dti, m)
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessVirtualAmbisonicReverb(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<ssize_t>(leftBuffer.size()), &leftBuffer[0]};
-            py::array_t<float> rightArray{static_cast<ssize_t>(rightBuffer.size()), &rightBuffer[0]};
+            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), &leftBuffer[0]};
+            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), &rightBuffer[0]};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CEnvironment& self) {
@@ -224,8 +224,8 @@ PYBIND11_MODULE(py3dti, m)
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessAnechoic(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<ssize_t>(leftBuffer.size()), &leftBuffer[0]};
-            py::array_t<float> rightArray{static_cast<ssize_t>(rightBuffer.size()), &rightBuffer[0]};
+            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), &leftBuffer[0]};
+            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), &rightBuffer[0]};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CSingleSourceDSP& self) {
@@ -295,7 +295,7 @@ PYBIND11_MODULE(py3dti, m)
                 sourceLengths.push_back(kv.second.size());
             }
             const py::ssize_t binauralLength = *max_element(sourceLengths.begin(), sourceLengths.end());
-            py::array_t<float, py::array::f_style> binauralSamples({binauralLength, 2L});
+            py::array_t<float, py::array::f_style> binauralSamples(py::array::ShapeContainer{binauralLength, py::ssize_t(2)});
             binauralSamples[py::ellipsis()] = 0.f;
             const int bufferSize = self.GetAudioState().bufferSize;
             CMonoBuffer<float> inputBuffer(bufferSize);
