@@ -3,11 +3,6 @@ name: Wheels
 on:
   workflow_dispatch:
   push:
-    branches:
-     - main
-  release:
-    types:
-      - published
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -91,13 +86,9 @@ jobs:
 
 
   upload_all:
-    name: Upload if release
+    name: Upload
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
-    environment: pypi
-    permissions:
-      id-token: write   # only needed for trusted publishing, see notes
 
     steps:
     - uses: actions/download-artifact@v7
@@ -107,3 +98,6 @@ jobs:
         path: dist
 
     - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
