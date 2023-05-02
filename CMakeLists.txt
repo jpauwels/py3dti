@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.15...3.26)
-project(py3dti VERSION ${SKBUILD_PROJECT_VERSION})
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+project(py3dti VERSION ${SKBUILD_PROJECT_VERSION})
 
 
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_Toolkit")
@@ -162,3 +162,8 @@ python_add_library(${PROJECT_NAME} MODULE py3dti.cpp ${SOURCES} ${SOFA_SOURCES} 
 target_link_libraries(${PROJECT_NAME} PRIVATE pybind11::headers)
 target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION})
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
+
+if(WIN32)
+	get_target_property(NETCDF_DLL NetCdf IMPORTED_LOCATION)
+	install(FILES ${NETCDF_DLL} DESTINATION .)
+endif()
