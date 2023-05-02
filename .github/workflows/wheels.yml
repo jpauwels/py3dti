@@ -50,6 +50,7 @@ jobs:
     - uses: pypa/cibuildwheel@v2.12.3
       env:
         CIBW_ARCHS_MACOS: auto universal2
+        CIBW_ENVIRONMENT: MACOSX_DEPLOYMENT_TARGET=10.15
 
     - name: Verify clean directory
       run: git diff --exit-code
