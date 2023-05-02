@@ -3,6 +3,7 @@ project(py3dti VERSION ${SKBUILD_PROJECT_VERSION})
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
 
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_Toolkit")
@@ -104,6 +105,7 @@ if(WIN32)
 		INTERFACE_INCLUDE_DIRECTORIES "${DEPENDENCIES_DIR}/include"
 	)
 	link_libraries(winmm.lib)
+	set(CMAKE_CXX_FLAGS_INIT "/d2FH4-")
 else()
 	add_library(Hdf5 STATIC IMPORTED)
 	add_library(Hdf5_HL STATIC IMPORTED)
