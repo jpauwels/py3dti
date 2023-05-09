@@ -490,9 +490,12 @@ PYBIND11_MODULE(py3dti, m)
     ;
 
     py::class_<CCore>(m, "BinauralRenderer")
-        .def(py::init([](const int sampleRate, const int bufferSize, const int resampledAngularResolution) {
-            return CCore({sampleRate, bufferSize}, resampledAngularResolution);
-        }), "rate"_a = 44100, "buffer_size"_a = 512, "resampled_angular_resolution"_a = 5)
+        .def(py::init([](const int sampleRate, const int bufferSize, const int resampledAngularResolution, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const float headRadius) {
+            CCore core({sampleRate, bufferSize}, resampledAngularResolution);
+            std::shared_ptr<CListener> listener = core.CreateListener(headRadius);
+            updateListenerPositionAndOrientation(listener, position, orientation);
+            return core;
+        }), "rate"_a = 44100, "buffer_size"_a = 512, "resampled_angular_resolution"_a = 5, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a =  0.0875)
         .def_property("rate", [](const CCore& self) {
             return self.GetAudioState().sampleRate;
         }, [](CCore& self, const int sampleRate) {
@@ -508,21 +511,6 @@ PYBIND11_MODULE(py3dti, m)
             self.SetAudioState(audioState);
         })
         .def_property("resampled_angular_resolution", &CCore::GetHRTFResamplingStep, &CCore::SetHRTFResamplingStep)
-        .def("add_listener", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const std::optional<float> headRadius) {
-            if (self.GetListener() != nullptr) {
-                throw std::runtime_error("BinauralRenderer already has a listener. Remove the previous one first.");
-            }
-            std::shared_ptr<CListener> listener;
-            if (headRadius) {
-                listener = self.CreateListener(*headRadius);
-                listener->EnableCustomizedITD();
-            } else {
-                listener = self.CreateListener();
-                listener->DisableCustomizedITD();
-            }
-            updateListenerPositionAndOrientation(listener, position, orientation);
-            return listener;
-        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a = py::none())
         .def_property_readonly("listener", &CCore::GetListener)
         .def("add_source", [](CCore& self, const std::optional<const Position> position) {
             std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
@@ -548,7 +536,6 @@ PYBIND11_MODULE(py3dti, m)
             size_t numSources = self.GetSources().size();
             oss << "<py3dti.BinauralRenderer (" << &self << ") with buffer size "
             << audioState.bufferSize << ", sample rate " << audioState.sampleRate << "Hz, "
-            << (self.GetListener() == nullptr ? "no" : "a") << " listener, "
             << numEnvironments << " environment" << (numEnvironments == 1 ? "" : "s")
             << " and " << numSources << " source" << (numSources == 1 ? "" : "s")
             << ">" << std::endl;
