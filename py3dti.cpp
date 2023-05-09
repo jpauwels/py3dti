@@ -88,9 +88,9 @@ void updateSourcePosition(const std::shared_ptr<CSingleSourceDSP>& source, const
 class BinauralStreamer
 {
 public:
-    BinauralStreamer(CCore binauralRenderer)
+    BinauralStreamer(const std::shared_ptr<CCore> binauralRenderer)
     : m_binauralRenderer(binauralRenderer)
-    , m_bufferSize(binauralRenderer.GetAudioState().bufferSize)
+    , m_bufferSize(binauralRenderer->GetAudioState().bufferSize)
     , m_inputBuffer(m_bufferSize)
     , m_leftBuffer(m_bufferSize)
     , m_rightBuffer(m_bufferSize)
@@ -110,7 +110,7 @@ protected:
     }
 
     void processEnvironments(const py::ssize_t size, float* const leftPtr, float* const rightPtr) {
-        for (const auto& environment : m_binauralRenderer.GetEnvironments()) {
+        for (const auto& environment : m_binauralRenderer->GetEnvironments()) {
             environment->ProcessVirtualAmbisonicReverb(m_leftBuffer, m_rightBuffer);
             addToOutput(size, leftPtr, rightPtr);
         }
@@ -122,7 +122,7 @@ protected:
         std::transform(m_rightBuffer.begin(), m_rightBuffer.begin()+size, rightPtr, rightPtr, std::plus<float>());
     }
 
-    const CCore m_binauralRenderer;
+    const std::shared_ptr<CCore> m_binauralRenderer;
     const int m_bufferSize;
     CMonoBuffer<float> m_inputBuffer;
     CMonoBuffer<float> m_leftBuffer;
@@ -133,12 +133,12 @@ protected:
 class FiniteBinauralStreamer: public BinauralStreamer
 {
 public:
-    FiniteBinauralStreamer(CCore binauralRenderer, const SourceSamplesMap& samplesMap, const SourceOffsetDurationMap& offsetMap = SourceOffsetDurationMap())
+    FiniteBinauralStreamer(const std::shared_ptr<CCore>& binauralRenderer, const SourceSamplesMap& samplesMap, const SourceOffsetDurationMap& offsetMap = SourceOffsetDurationMap())
     : BinauralStreamer(binauralRenderer)
     , m_samplesMap(samplesMap)
     {
         std::vector<py::ssize_t> sourceLengths;
-        const int sampleRate = binauralRenderer.GetAudioState().sampleRate;
+        const int sampleRate = binauralRenderer->GetAudioState().sampleRate;
         for (const auto& [source, samples] : samplesMap) {
             py::ssize_t offsetSamples = 0;
             const auto& offsetItem = offsetMap.find(source);
@@ -165,7 +165,7 @@ public:
         binauralSamples[py::ellipsis()] = 0.f;
         auto binauralMem = binauralSamples.mutable_unchecked<2>();
         // Update listener position and orientation if given
-        updateListenerPositionAndOrientation(m_binauralRenderer.GetListener(), listenerPosition, listenerOrientation);
+        updateListenerPositionAndOrientation(m_binauralRenderer->GetListener(), listenerPosition, listenerOrientation);
         // Update sources
         const py::ssize_t nextStart = m_start + m_bufferSize;
         for (const auto& [source, samples] : m_samplesMap) {
@@ -203,7 +203,7 @@ private:
 class OfflineFiniteBinauralStreamer: public FiniteBinauralStreamer
 {
 public:
-    OfflineFiniteBinauralStreamer(CCore binauralRenderer, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap = SourcePositionsMap(), const Positions& listenerPositions = Positions(), const Orientations& listenerOrientations = Orientations(), const SourceOffsetDurationMap& offsetMap = SourceOffsetDurationMap())
+    OfflineFiniteBinauralStreamer(const std::shared_ptr<CCore>& binauralRenderer, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap = SourcePositionsMap(), const Positions& listenerPositions = Positions(), const Orientations& listenerOrientations = Orientations(), const SourceOffsetDurationMap& offsetMap = SourceOffsetDurationMap())
     : FiniteBinauralStreamer(binauralRenderer, samplesMap, offsetMap)
     , m_binauralSamples({m_binauralLength, py::ssize_t(2)})
     {
@@ -211,7 +211,7 @@ public:
         auto binauralMem = m_binauralSamples.mutable_unchecked<2>();
         for (size_t blockIdx = 0; m_start < m_binauralLength; m_start += m_bufferSize, ++blockIdx) {
             // Update listener position and orientation if given
-            updateListenerPositionAndOrientation(m_binauralRenderer.GetListener(), blockIdx, listenerPositions, listenerOrientations);
+            updateListenerPositionAndOrientation(m_binauralRenderer->GetListener(), blockIdx, listenerPositions, listenerOrientations);
             // Update sources
             const py::ssize_t nextStart = std::min(m_start + m_bufferSize, m_binauralLength);
             for (const auto& [source, samples] : samplesMap) {
@@ -238,7 +238,7 @@ private:
 class InfiniteBinauralStreamer: public BinauralStreamer
 {
 public:
-    InfiniteBinauralStreamer(CCore binauralRenderer)
+    InfiniteBinauralStreamer(const std::shared_ptr<CCore>& binauralRenderer)
     : BinauralStreamer(binauralRenderer)
     {
     }
@@ -254,9 +254,9 @@ public:
         binauralSamples[py::ellipsis()] = 0.f;
         auto binauralMem = binauralSamples.mutable_unchecked<2>();
         // Update listener position and orientation if given
-        updateListenerPositionAndOrientation(m_binauralRenderer.GetListener(), listenerPosition, listenerOrientation);
+        updateListenerPositionAndOrientation(m_binauralRenderer->GetListener(), listenerPosition, listenerOrientation);
         // Update sources
-        for (const auto& source : m_binauralRenderer.GetSources()) {
+        for (const auto& source : m_binauralRenderer->GetSources()) {
             // Update source position if given
             updateSourcePosition(source, positionMap);
             // Process source samples if given
@@ -496,20 +496,24 @@ PYBIND11_MODULE(py3dti, m)
     ;
 
     py::class_<FiniteBinauralStreamer>(m, "FiniteBinauralStreamer")
-        .def(py::init<CCore, SourceSamplesMap, SourceOffsetDurationMap>(), "binaural_renderer"_a, "source_samples_map"_a, "source_offset_map"_a = SourceOffsetDurationMap())
+        .def(py::init<const std::shared_ptr<CCore>&, SourceSamplesMap, SourceOffsetDurationMap>(), "binaural_renderer"_a, "source_samples_map"_a, "source_offset_map"_a = SourceOffsetDurationMap())
         .def("__call__", &FiniteBinauralStreamer::operator(), "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
         .def("__len__", &FiniteBinauralStreamer::size)
     ;
 
     py::class_<InfiniteBinauralStreamer>(m, "InfiniteBinauralStreamer")
-        .def(py::init<CCore>(), "binaural_renderer"_a)
+        .def(py::init<const std::shared_ptr<CCore>&>(), "binaural_renderer"_a)
         .def("__call__", &InfiniteBinauralStreamer::operator(), "source_samples_map"_a, "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
     ;
 
-    py::class_<CCore>(m, "BinauralRenderer")
-        .def(py::init([](const int sampleRate, const int bufferSize, const int resampledAngularResolution) {
-            return CCore({sampleRate, bufferSize}, resampledAngularResolution);
-        }), "rate"_a = 44100, "buffer_size"_a = 512, "resampled_angular_resolution"_a = 5)
+    py::class_<CCore, std::shared_ptr<CCore>>(m, "BinauralRenderer")
+        .def(py::init([](const int sampleRate, const int bufferSize, const int resampledAngularResolution, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const float headRadius) {
+            TAudioStateStruct state{sampleRate, bufferSize};
+            auto core = std::make_shared<CCore>(state, resampledAngularResolution);
+            auto listener = core->CreateListener(headRadius);
+            updateListenerPositionAndOrientation(listener, position, orientation);
+            return core;
+        }), "rate"_a = 44100, "buffer_size"_a = 512, "resampled_angular_resolution"_a = 5, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a =  0.0875)
         .def_property("rate", [](const CCore& self) {
             return self.GetAudioState().sampleRate;
         }, [](CCore& self, const int sampleRate) {
@@ -525,37 +529,22 @@ PYBIND11_MODULE(py3dti, m)
             self.SetAudioState(audioState);
         })
         .def_property("resampled_angular_resolution", &CCore::GetHRTFResamplingStep, &CCore::SetHRTFResamplingStep)
-        .def("add_listener", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const std::optional<float> headRadius) {
-            if (self.GetListener() != nullptr) {
-                throw std::runtime_error("BinauralRenderer already has a listener. Remove the previous one first.");
-            }
-            std::shared_ptr<CListener> listener;
-            if (headRadius) {
-                listener = self.CreateListener(*headRadius);
-                listener->EnableCustomizedITD();
-            } else {
-                listener = self.CreateListener();
-                listener->DisableCustomizedITD();
-            }
-            updateListenerPositionAndOrientation(listener, position, orientation);
-            return listener;
-        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a = py::none())
-        .def_property_readonly("listener", &CCore::GetListener)
+        .def_property_readonly("listener", py::cpp_function(&CCore::GetListener, py::keep_alive<0, 1>()))
         .def("add_source", [](CCore& self, const std::optional<const Position> position) {
             std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
             updateSourcePosition(source, position);
             return source;
-        }, "position"_a = py::none())
+        }, "position"_a = py::none(), py::keep_alive<0, 1>())
         .def_property_readonly("sources", &CCore::GetSources)
-        .def("add_environment", &CCore::CreateEnvironment)
+        .def("add_environment", &CCore::CreateEnvironment, py::keep_alive<0, 1>())
         .def_property_readonly("environments", &CCore::GetEnvironments)
-        .def("render_offline", [](const CCore& self, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap, const Positions& listenerPositions, const Orientations& listenerOrientations, const SourceOffsetDurationMap& offsetMap) {
+        .def("render_offline", [](const std::shared_ptr<CCore>& self, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap, const Positions& listenerPositions, const Orientations& listenerOrientations, const SourceOffsetDurationMap& offsetMap) {
             return OfflineFiniteBinauralStreamer(self, samplesMap, positionsMap, listenerPositions, listenerOrientations, offsetMap)();
         }, "source_samples_map"_a, "source_positions_map"_a = SourcePositionsMap(), "listener_positions"_a = Positions(), "listener_orientations"_a = Orientations(), "source_offset_map"_a = SourceOffsetDurationMap())
-        .def("render_online", [](const CCore& self) {
+        .def("render_online", [](const std::shared_ptr<CCore>& self) {
             return InfiniteBinauralStreamer(self);
         })
-        .def("render_online", [](const CCore& self, const SourceSamplesMap& samplesMap, const SourceOffsetDurationMap& offsetMap) {
+        .def("render_online", [](const std::shared_ptr<CCore>& self, const SourceSamplesMap& samplesMap, const SourceOffsetDurationMap& offsetMap) {
             return FiniteBinauralStreamer(self, samplesMap, offsetMap);
         }, "source_samples_map"_a, "source_offset_map"_a = SourceOffsetDurationMap())
         .def("__repr__", [](const CCore& self) {
@@ -565,7 +554,6 @@ PYBIND11_MODULE(py3dti, m)
             size_t numSources = self.GetSources().size();
             oss << "<py3dti.BinauralRenderer (" << &self << ") with buffer size "
             << audioState.bufferSize << ", sample rate " << audioState.sampleRate << "Hz, "
-            << (self.GetListener() == nullptr ? "no" : "a") << " listener, "
             << numEnvironments << " environment" << (numEnvironments == 1 ? "" : "s")
             << " and " << numSources << " source" << (numSources == 1 ? "" : "s")
             << ">" << std::endl;
