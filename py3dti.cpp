@@ -260,7 +260,7 @@ PYBIND11_MODULE(py3dti, m)
 {
     m.doc() = "";
 
-    py::class_<CListener, std::shared_ptr<CListener> >(m, "Listener")
+    py::class_<CListener, std::unique_ptr<CListener> >(m, "Listener")
         .def_property("position", [](const CListener& self) {
             const CVector3 v = self.GetListenerTransform().GetPosition();
             return std::make_tuple(v.x, v.y, v.z);
