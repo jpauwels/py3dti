@@ -519,16 +519,7 @@ PYBIND11_MODULE(py3dti, m)
         .def_property_readonly("listener", &CCore::GetListener)
         .def("add_source", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation) {
             std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
-            if (position || orientation) {
-                CTransform transform = source->GetCurrentSourceTransform();
-                if (position) {
-                    transform.SetPosition(CVector3(std::get<0>(*position), std::get<1>(*position), std::get<2>(*position)));
-                }
-                if (orientation) {
-                    transform.SetOrientation(CQuaternion(std::get<0>(*orientation), std::get<1>(*orientation), std::get<2>(*orientation), std::get<3>(*orientation)));
-                }
-                source->SetSourceTransform(transform);
-            }
+            updateSourcePositionAndOrientation(source, position, orientation);
             return source;
         }, "position"_a = py::none(), "orientation"_a = py::none())
         .def_property_readonly("sources", &CCore::GetSources)
