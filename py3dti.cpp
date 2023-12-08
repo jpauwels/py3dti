@@ -28,11 +28,9 @@ typedef std::vector<Position> Positions;
 typedef std::vector<Orientation> Orientations;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const py::array_t<float>> SourceSamplesMap;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Position> SourcePositionMap;
-typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Orientation> SourceOrientationMap;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Positions> SourcePositionsMap;
-typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Orientations> SourceOrientationsMap;
 
-void updateTransform(CTransform &transform, const std::optional<Position>& position, const std::optional<Orientation>& orientation)
+void updateTransform(CTransform &transform, const std::optional<Position>& position, const std::optional<Orientation>& orientation = std::nullopt)
 {
     if (position) {
         transform.SetPosition(CVector3(std::get<0>(*position), std::get<1>(*position), std::get<2>(*position)));
@@ -57,23 +55,22 @@ void updateListenerPositionAndOrientation(const std::shared_ptr<CListener>& list
     updateListenerPositionAndOrientation(listener, position, orientation);
 }
 
-void updateSourcePositionAndOrientation(const std::shared_ptr<CSingleSourceDSP>& source, const std::optional<Position>& position, const std::optional<Orientation>& orientation)
+void updateSourcePosition(const std::shared_ptr<CSingleSourceDSP>& source, const std::optional<Position>& position)
 {
-    if (position || orientation) {
+    if (position) {
         CTransform transform = source->GetCurrentSourceTransform();
-        updateTransform(transform, position, orientation);
+        updateTransform(transform, position);
         source->SetSourceTransform(transform);
     }
 }
 
-void updateSourcePositionAndOrientation(const std::shared_ptr<CSingleSourceDSP>& source, const SourcePositionMap &positionMap, const SourceOrientationMap& orientationMap)
+void updateSourcePosition(const std::shared_ptr<CSingleSourceDSP>& source, const SourcePositionMap &positionMap)
 {
     const auto position = positionMap.find(source) != positionMap.end() ? std::optional<const Position>(positionMap.find(source)->second) : std::nullopt;
-    const auto orientation = orientationMap.find(source) != orientationMap.end() ? std::optional<const Orientation>(orientationMap.find(source)->second) : std::nullopt;
-    updateSourcePositionAndOrientation(source, position, orientation);
+    updateSourcePosition(source, position);
 }
 
-void updateSourcePositionAndOrientation(const std::shared_ptr<CSingleSourceDSP>& source, const size_t blockIdx, const SourcePositionsMap& positionsMap, const SourceOrientationsMap& orientationsMap)
+void updateSourcePosition(const std::shared_ptr<CSingleSourceDSP>& source, const size_t blockIdx, const SourcePositionsMap& positionsMap)
 {
     std::optional<Position> position;
     if (positionsMap.find(source) != positionsMap.end()) {
@@ -82,14 +79,7 @@ void updateSourcePositionAndOrientation(const std::shared_ptr<CSingleSourceDSP>&
             position = std::optional<const Position>(positions[blockIdx]);
         }
     }
-    std::optional<Orientation> orientation;
-    if (orientationsMap.find(source) != orientationsMap.end()) {
-        const Orientations orientations = orientationsMap.find(source)->second;
-        if (blockIdx < orientations.size()) {
-            orientation = std::optional<const Orientation>(orientations[blockIdx]);
-        }
-    }
-    updateSourcePositionAndOrientation(source, position, orientation);
+    updateSourcePosition(source, position);
 }
 
 class BinauralStreamer
@@ -156,7 +146,7 @@ public:
         return std::ceil(static_cast<double>(m_binauralLength) / m_bufferSize);
     }
 
-    py::array_t<float, py::array::f_style> operator()(const SourcePositionMap& positionMap, const SourceOrientationMap& orientationMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
+    py::array_t<float, py::array::f_style> operator()(const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
     {
         if (m_start >= m_binauralLength) {
             throw py::stop_iteration("All source samples have been processed.");
@@ -169,8 +159,8 @@ public:
         // Update sources
         const py::ssize_t nextStart = m_start + m_bufferSize;
         for (const auto& [source, samples] : m_samplesMap) {
-            // Update source position and orientation if given
-            updateSourcePositionAndOrientation(source, positionMap, orientationMap);
+            // Update source position if given
+            updateSourcePosition(source, positionMap);
             // Process source samples if any still left
             if (m_start < samples.size()) {
                 const py::ssize_t sourceEnd = std::min(nextStart, samples.size());
@@ -192,7 +182,7 @@ protected:
 class OfflineFiniteBinauralStreamer: public FiniteBinauralStreamer
 {
 public:
-    OfflineFiniteBinauralStreamer(CCore binauralRenderer, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap = SourcePositionsMap(), const SourceOrientationsMap& orientationsMap = SourceOrientationsMap(), const Positions& listenerPositions = Positions(), const Orientations& listenerOrientations = Orientations())
+    OfflineFiniteBinauralStreamer(CCore binauralRenderer, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap = SourcePositionsMap(), const Positions& listenerPositions = Positions(), const Orientations& listenerOrientations = Orientations())
     : FiniteBinauralStreamer(binauralRenderer, samplesMap)
     , m_binauralSamples({m_binauralLength, py::ssize_t(2)})
     {
@@ -204,8 +194,8 @@ public:
             // Update sources
             const py::ssize_t blockEnd = std::min(m_start + m_bufferSize, m_binauralLength);
             for (const auto& [source, samples] : samplesMap) {
-                // Update source position and orientation if given
-                updateSourcePositionAndOrientation(source, blockIdx, positionsMap, orientationsMap);
+                // Update source position if given
+                updateSourcePosition(source, blockIdx, positionsMap);
                 // Process source samples if any still left
                 if (m_start < samples.size()) {
                     const py::ssize_t sourceEnd = std::min(blockEnd, samples.size());
@@ -236,7 +226,7 @@ public:
     {
     }
 
-    py::array_t<float, py::array::f_style> operator()(const SourceSamplesMap& samplesMap, const SourcePositionMap& positionMap, const SourceOrientationMap& orientationMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
+    py::array_t<float, py::array::f_style> operator()(const SourceSamplesMap& samplesMap, const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
     {
         for (const auto& [source, samples] : samplesMap) {
             if (samples.size() > m_bufferSize) {
@@ -250,8 +240,8 @@ public:
         updateListenerPositionAndOrientation(m_binauralRenderer.GetListener(), listenerPosition, listenerOrientation);
         // Update sources
         for (const auto& source : m_binauralRenderer.GetSources()) {
-            // Update source position and orientation if given
-            updateSourcePositionAndOrientation(source, positionMap, orientationMap);
+            // Update source position if given
+            updateSourcePosition(source, positionMap);
             // Process source samples if given
             if (samplesMap.find(source) != samplesMap.end()) {
                 const auto& samples = samplesMap.find(source)->second;
@@ -380,14 +370,6 @@ PYBIND11_MODULE(py3dti, m)
             transform.SetPosition(CVector3(std::get<0>(position), std::get<1>(position), std::get<2>(position)));
             self.SetSourceTransform(transform);
         })
-        .def_property("orientation", [](const CSingleSourceDSP& self) {
-            const CQuaternion q = self.GetCurrentSourceTransform().GetOrientation();
-            return std::make_tuple(q.w, q.x, q.y, q.z);
-        }, [](CSingleSourceDSP& self, const Orientation& orientation) {
-            CTransform transform = self.GetCurrentSourceTransform();
-            transform.SetOrientation(CQuaternion(std::get<0>(orientation), std::get<1>(orientation), std::get<2>(orientation), std::get<3>(orientation)));
-            self.SetSourceTransform(transform);
-        })
         .def_property("spatialization_mode", &CSingleSourceDSP::GetSpatializationMode, &CSingleSourceDSP::SetSpatializationMode)
         .def_property("interpolation", &CSingleSourceDSP::IsInterpolationEnabled,
         [](CSingleSourceDSP& self, const bool value) {
@@ -473,20 +455,20 @@ PYBIND11_MODULE(py3dti, m)
         })
         .def("__repr__", [](const CSingleSourceDSP& self) {
             std::ostringstream oss;
-            oss << "<py3dti.Source (" << &self << ") at position " << self.GetCurrentSourceTransform().GetPosition() << " with orientation " << self.GetCurrentSourceTransform().GetOrientation() << " >" << std::endl;
+            oss << "<py3dti.Source (" << &self << ") at position " << self.GetCurrentSourceTransform().GetPosition() << ">" << std::endl;
             return oss.str();
         })
     ;
 
     py::class_<FiniteBinauralStreamer>(m, "FiniteBinauralStreamer")
         .def(py::init<CCore, SourceSamplesMap>(), "binaural_renderer"_a, "source_samples_map"_a)
-        .def("__call__", &FiniteBinauralStreamer::operator(), "source_position_map"_a = SourcePositionMap(), "source_orientation_map"_a = SourceOrientationMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
+        .def("__call__", &FiniteBinauralStreamer::operator(), "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
         .def("__len__", &FiniteBinauralStreamer::size)
     ;
 
     py::class_<InfiniteBinauralStreamer>(m, "InfiniteBinauralStreamer")
         .def(py::init<CCore>(), "binaural_renderer"_a)
-        .def("__call__", &InfiniteBinauralStreamer::operator(), "source_samples_map"_a, "source_position_map"_a = SourcePositionMap(), "source_orientation_map"_a = SourceOrientationMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
+        .def("__call__", &InfiniteBinauralStreamer::operator(), "source_samples_map"_a, "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
     ;
 
     py::class_<CCore>(m, "BinauralRenderer")
@@ -515,19 +497,19 @@ PYBIND11_MODULE(py3dti, m)
             std::shared_ptr<CListener> listener = self.CreateListener(headRadius);
             updateListenerPositionAndOrientation(listener, position, orientation);
             return listener;
-        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a =  0.0875)
+        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a = 0.0875)
         .def_property_readonly("listener", &CCore::GetListener)
-        .def("add_source", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation) {
+        .def("add_source", [](CCore& self, const std::optional<const Position> position) {
             std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
-            updateSourcePositionAndOrientation(source, position, orientation);
+            updateSourcePosition(source, position);
             return source;
-        }, "position"_a = py::none(), "orientation"_a = py::none())
+        }, "position"_a = py::none())
         .def_property_readonly("sources", &CCore::GetSources)
         .def("add_environment", &CCore::CreateEnvironment)
         .def_property_readonly("environments", &CCore::GetEnvironments)
-        .def("render_offline", [](const CCore& self, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap, const SourceOrientationsMap& orientationsMap, const Positions& listenerPositions, const Orientations& listenerOrientations) {
-            return OfflineFiniteBinauralStreamer(self, samplesMap, positionsMap, orientationsMap, listenerPositions, listenerOrientations)();
-        }, "source_samples_map"_a, "source_positions_map"_a = SourcePositionsMap(), "source_orientations_map"_a = SourceOrientationsMap(), "listener_positions"_a = Positions(), "listener_orientations"_a = Orientations())
+        .def("render_offline", [](const CCore& self, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap, const Positions& listenerPositions, const Orientations& listenerOrientations) {
+            return OfflineFiniteBinauralStreamer(self, samplesMap, positionsMap, listenerPositions, listenerOrientations)();
+        }, "source_samples_map"_a, "source_positions_map"_a = SourcePositionsMap(), "listener_positions"_a = Positions(), "listener_orientations"_a = Orientations())
         .def("render_online", [](const CCore& self) {
             return InfiniteBinauralStreamer(self);
         })
