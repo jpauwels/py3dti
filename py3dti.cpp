@@ -277,7 +277,20 @@ PYBIND11_MODULE(py3dti, m)
             transform.SetOrientation(CQuaternion(std::get<0>(orientation), std::get<1>(orientation), std::get<2>(orientation), std::get<3>(orientation)));
             self.SetListenerTransform(transform);
         })
-        .def_property("head_radius", &CListener::GetHeadRadius, &CListener::SetHeadRadius)
+        .def_property("head_radius", [](const CListener& self) -> std::optional<float> {
+            if (self.IsCustomizedITDEnabled()) {
+                return self.GetHeadRadius();
+            } else {
+                return std::nullopt;
+            }
+        }, [](CListener& self, const std::optional<float> headRadius) {
+            if (headRadius) {
+                self.SetHeadRadius(*headRadius);
+                self.EnableCustomizedITD();
+            } else {
+                self.DisableCustomizedITD();
+            }
+        })
         .def_property("ild_attenuation", &CListener::GetILDAttenuation, &CListener::SetILDAttenuation)
         .def("load_hrtf_from_sofa", [](const std::shared_ptr<CListener>& self, const std::string& sofaPath) {
             bool specifiedDelays;
@@ -313,7 +326,12 @@ PYBIND11_MODULE(py3dti, m)
         }, "table_path"_a)
         .def("__repr__", [](const CListener& self) {
             std::ostringstream oss;
-            oss << "<py3dti.Listener (" << &self << ") at position " << self.GetListenerTransform().GetPosition() << " with orientation " << self.GetListenerTransform().GetOrientation() << " >" << std::endl;
+            oss << "<py3dti.Listener (" << &self << ") at position " << self.GetListenerTransform().GetPosition() << " with orientation " << self.GetListenerTransform().GetOrientation();
+            if (self.IsCustomizedITDEnabled()) {
+                oss.precision(4);
+                oss << " and a head radius of " << self.GetHeadRadius() << " m";
+            }
+            oss << ">" << std::endl;
             return oss.str();
         })
     ;
@@ -490,14 +508,21 @@ PYBIND11_MODULE(py3dti, m)
             self.SetAudioState(audioState);
         })
         .def_property("resampled_angular_resolution", &CCore::GetHRTFResamplingStep, &CCore::SetHRTFResamplingStep)
-        .def("add_listener", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const float headRadius) {
+        .def("add_listener", [](CCore& self, const std::optional<const Position> position, const std::optional<const Orientation> orientation, const std::optional<float> headRadius) {
             if (self.GetListener() != nullptr) {
                 throw std::runtime_error("BinauralRenderer already has a listener. Remove the previous one first.");
             }
-            std::shared_ptr<CListener> listener = self.CreateListener(headRadius);
+            std::shared_ptr<CListener> listener;
+            if (headRadius) {
+                listener = self.CreateListener(*headRadius);
+                listener->EnableCustomizedITD();
+            } else {
+                listener = self.CreateListener();
+                listener->DisableCustomizedITD();
+            }
             updateListenerPositionAndOrientation(listener, position, orientation);
             return listener;
-        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a = 0.0875)
+        }, "position"_a = py::none(), "orientation"_a = py::none(), "head_radius"_a = py::none())
         .def_property_readonly("listener", &CCore::GetListener)
         .def("add_source", [](CCore& self, const std::optional<const Position> position) {
             std::shared_ptr<CSingleSourceDSP> source = self.CreateSingleSourceDSP();
