@@ -1,1 +1,5 @@
 macos-xcode
+build
+dist
+docs/.ipynb_checkpoints
+docs/3DTI-Toolkit_Binaural_Test_App_Resources
