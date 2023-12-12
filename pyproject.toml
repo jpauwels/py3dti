@@ -5,7 +5,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "py3dti"
-version = "0.2.0"
+version = "0.3.0"
 description="Python bindings for the 3dti Audio Spatialiser."
 readme = "README.md"
 authors = [
