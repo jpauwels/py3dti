@@ -161,6 +161,7 @@ find_package(pybind11 CONFIG REQUIRED)
 python_add_library(${PROJECT_NAME} MODULE py3dti.cpp ${SOURCES} ${SOFA_SOURCES} ${HEADERS} WITH_SOABI)
 target_link_libraries(${PROJECT_NAME} PRIVATE pybind11::headers)
 target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 
 install(FILES $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}> DESTINATION .) # includes Python dll
