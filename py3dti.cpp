@@ -573,6 +573,28 @@ PYBIND11_MODULE(py3dti, m)
         })
     ;
 
+    m.def("taitbryan2quaternion", [](const float yaw, const float pitch, const float roll) {
+        const CQuaternion q = CQuaternion::FromYawPitchRoll(yaw, pitch, roll);
+        return std::make_tuple(q.w, q.x, q.y, q.z);
+    }, "yaw"_a, "pitch"_a, "roll"_a);
+    m.def("quaternion2taitbryan", [](const float scalar, const float backFront, const float rightLeft, const float downUp) {
+        const CQuaternion q(scalar, backFront, rightLeft, downUp);
+        float yaw, pitch, roll;
+        q.ToYawPitchRoll(yaw, pitch, roll);
+        return std::make_tuple(yaw, pitch, roll);
+    }, "scalar"_a, "back_front"_a, "right_left"_a, "down_up"_a);
+    m.def("axisangle2quaternion", [](const float backFront, const float rightLeft, const float downUp, const float angle) {
+        const CQuaternion q = CQuaternion::FromAxisAngle(CVector3(backFront, rightLeft, downUp), angle);
+        return std::make_tuple(q.w, q.x, q.y, q.z);
+    }, "back_front"_a, "right_left"_a, "down_up"_a, "angle"_a);
+    m.def("quaternion2axisangle", [](const float scalar, const float backFront, const float rightLeft, const float downUp) {
+        const CQuaternion q(scalar, backFront, rightLeft, downUp);
+        CVector3 axis;
+        float angle;
+        q.ToAxisAngle(axis, angle);
+        return std::make_tuple(axis.x, axis.y, axis.z, angle);
+    }, "scalar"_a, "back_front"_a, "right_left"_a, "down_up"_a);
+
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
