@@ -1,0 +1,10 @@
+{
+  "name": "py3dti",
+  "dependencies": [
+    { "name": "netcdf-c", "features": ["netcdf-4"] },
+    "netcdf-cxx4",
+    "hdf5",
+    "curl",
+    "zlib"
+  ]
+}
