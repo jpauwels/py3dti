@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.21...3.26)
+cmake_minimum_required(VERSION 3.21...4.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment version")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
-project(py3dti VERSION ${SKBUILD_PROJECT_VERSION})
+project(${SKBUILD_PROJECT_NAME} VERSION ${SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
 
 include_directories("${PROJECT_SOURCE_DIR}/3dti_AudioToolkit/3dti_Toolkit")
