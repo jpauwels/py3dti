@@ -309,33 +309,17 @@ PYBIND11_MODULE(py3dti, m)
             }
         })
         .def_property("ild_attenuation", &CListener::GetILDAttenuation, &CListener::SetILDAttenuation)
-        .def("load_hrtf_from_sofa", [](const std::shared_ptr<CListener>& self, const std::string& sofaPath) {
-            bool specifiedDelays;
-            if (!HRTF::CreateFromSofa(sofaPath, self, specifiedDelays)) {
-                throw std::runtime_error("Loading HRTF from SOFA file failed.");
-            }
-        }, "sofa_path"_a)
         .def("load_hrtf_from_sofa", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& sofaPath) {
             bool specifiedDelays;
             if (!HRTF::CreateFromSofa(sofaPath.string(), self, specifiedDelays)) {
                 throw std::runtime_error("Loading HRTF from SOFA file failed.");
             }
         }, "sofa_path"_a)
-        .def("load_hrtf_from_3dti", [](const std::shared_ptr<CListener>& self, const std::string& threedtiPath) {
-            if (!HRTF::CreateFrom3dti(threedtiPath, self)) {
-                throw std::runtime_error("Loading HRTF from 3dti file failed.");
-            }
-        }, "3dti_path"_a)
         .def("load_hrtf_from_3dti", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& threedtiPath) {
             if (!HRTF::CreateFrom3dti(threedtiPath.string(), self)) {
                 throw std::runtime_error("Loading HRTF from 3dti file failed.");
             }
         }, "3dti_path"_a)
-        .def("load_ild_near_field_effect_table", [](const std::shared_ptr<CListener>& self, const std::string& tablePath) {
-            if (!ILD::CreateFrom3dti_ILDNearFieldEffectTable(tablePath, self)) {
-                throw std::runtime_error("Loading ILD Near Field Effect configuration from 3dti file failed.");
-            }
-        }, "table_path"_a)
         .def("load_ild_near_field_effect_table", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& tablePath) {
             if (!ILD::CreateFrom3dti_ILDNearFieldEffectTable(tablePath.string(), self)) {
                 throw std::runtime_error("Loading ILD Near Field Effect configuration from 3dti file failed.");
@@ -354,21 +338,11 @@ PYBIND11_MODULE(py3dti, m)
     ;
 
     py::class_<CEnvironment, std::shared_ptr<CEnvironment> >(m, "Environment")
-        .def("load_brir_from_sofa", [](const std::shared_ptr<CEnvironment>& self, const std::string& sofaPath) {
-            if (!BRIR::CreateFromSofa(sofaPath, self)) {
-                throw std::runtime_error("Loading BRIR from SOFA file failed.");
-            };
-        }, "sofa_path"_a)
         .def("load_brir_from_sofa", [](const std::shared_ptr<CEnvironment>& self, const std::filesystem::path& sofaPath) {
             if (!BRIR::CreateFromSofa(sofaPath.string(), self)) {
                 throw std::runtime_error("Loading BRIR from SOFA file failed.");
             }
         }, "sofa_path"_a)
-        .def("load_brir_from_3dti", [](const std::shared_ptr<CEnvironment>& self, const std::string& threedtiPath) {
-            if (!BRIR::CreateFrom3dti(threedtiPath, self)) {
-                throw std::runtime_error("Loading BRIR from 3dti file failed.");
-            }
-        }, "3dti_path"_a)
         .def("load_brir_from_3dti", [](const std::shared_ptr<CEnvironment>& self, const std::filesystem::path& threedtiPath) {
             if (!BRIR::CreateFrom3dti(threedtiPath.string(), self)) {
                 throw std::runtime_error("Loading BRIR from 3dti file failed.");
