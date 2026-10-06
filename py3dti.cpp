@@ -332,7 +332,7 @@ PYBIND11_MODULE(py3dti, m)
                 oss.precision(4);
                 oss << " and a head radius of " << self.GetHeadRadius() << " m";
             }
-            oss << ">" << std::endl;
+            oss << ">";
             return oss.str();
         })
     ;
@@ -358,7 +358,7 @@ PYBIND11_MODULE(py3dti, m)
         })
         .def("__repr__", [](const CEnvironment& self) {
             std::ostringstream oss;
-            oss << "<py3dti.Environment (" << &self << ")>" << std::endl;
+            oss << "<py3dti.Environment (" << &self << ")>";
             return oss.str();
         })
     ;
@@ -464,7 +464,7 @@ PYBIND11_MODULE(py3dti, m)
         })
         .def("__repr__", [](const CSingleSourceDSP& self) {
             std::ostringstream oss;
-            oss << "<py3dti.Source (" << &self << ") at position " << self.GetCurrentSourceTransform().GetPosition() << ">" << std::endl;
+            oss << "<py3dti.Source (" << &self << ") at position " << self.GetCurrentSourceTransform().GetPosition() << ">";
             return oss.str();
         })
     ;
@@ -526,7 +526,7 @@ PYBIND11_MODULE(py3dti, m)
             << audioState.bufferSize << ", sample rate " << audioState.sampleRate << "Hz, "
             << numEnvironments << " environment" << (numEnvironments == 1 ? "" : "s")
             << " and " << numSources << " source" << (numSources == 1 ? "" : "s")
-            << ">" << std::endl;
+            << ">";
             return oss.str();
         })
     ;
