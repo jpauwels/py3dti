@@ -521,12 +521,8 @@ PYBIND11_MODULE(py3dti, m)
             audioState.sampleRate = sampleRate;
             self.SetAudioState(audioState);
         })
-        .def_property("buffer_size", [](const CCore& self) {
+        .def_property_readonly("buffer_size", [](const CCore& self) {
             return self.GetAudioState().bufferSize;
-        }, [](CCore& self, const int bufferSize) {
-            TAudioStateStruct audioState = self.GetAudioState();
-            audioState.bufferSize = bufferSize;
-            self.SetAudioState(audioState);
         })
         .def_property("resampled_angular_resolution", &CCore::GetHRTFResamplingStep, &CCore::SetHRTFResamplingStep)
         .def_property_readonly("listener", py::cpp_function(&CCore::GetListener, py::keep_alive<0, 1>()))
