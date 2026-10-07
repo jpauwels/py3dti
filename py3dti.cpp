@@ -159,10 +159,21 @@ public:
 
     size_t size() const
     {
-        return std::ceil(static_cast<double>(m_binauralLength) / m_bufferSize);
+        return std::ceil(static_cast<double>(m_binauralLength - m_start) / m_bufferSize);
     }
 
-    BinauralOutput operator()(const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
+    void reset()
+    {
+        m_start = 0;
+        for (const auto& [source, samples] : m_samplesMap) {
+            source->ResetSourceBuffers();
+        }
+        for (const auto& environment : m_binauralRenderer->GetEnvironments()) {
+            environment->ResetReverbBuffers();
+        }
+    }
+
+    BinauralOutput operator()(const SourcePositionMap& positionMap = SourcePositionMap(), const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
     {
         if (m_start >= m_binauralLength) {
             throw py::stop_iteration("All source samples have been processed.");
@@ -477,8 +488,16 @@ PYBIND11_MODULE(py3dti, m)
 
     py::class_<FiniteBinauralStreamer>(m, "FiniteBinauralStreamer")
         .def(py::init<const std::shared_ptr<CCore>&, SourceSamplesMap, SourceOffsetDurationMap>(), "binaural_renderer"_a, "source_samples_map"_a, "source_offset_map"_a = SourceOffsetDurationMap())
-        .def("__call__", &FiniteBinauralStreamer::operator(), "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
+        .def("__call__", [](FiniteBinauralStreamer& self, const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition, const std::optional<const Orientation>& listenerOrientation) {
+            if (positionMap.empty() && !listenerPosition && !listenerOrientation) {
+                throw py::type_error("Calling the streamer without arguments is not supported. Iterate over it directly (`for block in streamer:`) or pass source/listener positions.");
+            }
+            return self(positionMap, listenerPosition, listenerOrientation);
+        }, "source_position_map"_a = SourcePositionMap(), "listener_position"_a = py::none(), "listener_orientation"_a = py::none())
         .def("__len__", &FiniteBinauralStreamer::size)
+        .def("__iter__", [](py::object self) { return self; })
+        .def("__next__", [](FiniteBinauralStreamer& self) { return self(); })
+        .def("reset", &FiniteBinauralStreamer::reset)
     ;
 
     py::class_<InfiniteBinauralStreamer>(m, "InfiniteBinauralStreamer")
