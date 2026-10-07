@@ -320,17 +320,17 @@ PYBIND11_MODULE(py3dti, m)
             if (!HRTF::CreateFromSofa(sofaPath.string(), self, specifiedDelays)) {
                 throw std::runtime_error("Loading HRTF from SOFA file failed.");
             }
-        }, "sofa_path"_a)
+        }, "sofa_path"_a, py::call_guard<py::gil_scoped_release>())
         .def("load_hrtf_from_3dti", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& threedtiPath) {
             if (!HRTF::CreateFrom3dti(threedtiPath.string(), self)) {
                 throw std::runtime_error("Loading HRTF from 3dti file failed.");
             }
-        }, "3dti_path"_a)
+        }, "3dti_path"_a, py::call_guard<py::gil_scoped_release>())
         .def("load_ild_near_field_effect_table", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& tablePath) {
             if (!ILD::CreateFrom3dti_ILDNearFieldEffectTable(tablePath.string(), self)) {
                 throw std::runtime_error("Loading ILD Near Field Effect configuration from 3dti file failed.");
             }
-        }, "table_path"_a)
+        }, "table_path"_a, py::call_guard<py::gil_scoped_release>())
         .def("__repr__", [](const CListener& self) {
             std::ostringstream oss;
             oss << "<py3dti.Listener (" << &self << ") at position " << self.GetListenerTransform().GetPosition() << " with orientation " << self.GetListenerTransform().GetOrientation();
@@ -348,12 +348,12 @@ PYBIND11_MODULE(py3dti, m)
             if (!BRIR::CreateFromSofa(sofaPath.string(), self)) {
                 throw std::runtime_error("Loading BRIR from SOFA file failed.");
             }
-        }, "sofa_path"_a)
+        }, "sofa_path"_a, py::call_guard<py::gil_scoped_release>())
         .def("load_brir_from_3dti", [](const std::shared_ptr<CEnvironment>& self, const std::filesystem::path& threedtiPath) {
             if (!BRIR::CreateFrom3dti(threedtiPath.string(), self)) {
                 throw std::runtime_error("Loading BRIR from 3dti file failed.");
             }
-        }, "3dti_path"_a)
+        }, "3dti_path"_a, py::call_guard<py::gil_scoped_release>())
         .def("process_virtual_ambisonic_reverb", [](CEnvironment& self) {
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
