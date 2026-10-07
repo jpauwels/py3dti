@@ -269,7 +269,7 @@ public:
             if (samplesMap.find(source) != samplesMap.end()) {
                 const auto& samples = samplesMap.find(source)->second;
                 const Size sourceSize = std::min(static_cast<Size>(m_bufferSize), samples.size());
-                processSourceSamples(source, samples, binauralMem.mutable_data(0, 0), binauralMem.mutable_data(0, 1), sourceSize, sourceSize);
+                processSourceSamples(source, samples, binauralMem.mutable_data(0, 0), binauralMem.mutable_data(0, 1), 0, sourceSize);
             }
         }
         // Update environments
