@@ -185,7 +185,7 @@ protected:
 
     void processSourceSamples(const std::shared_ptr<CSingleSourceDSP>& source, const py::array_t<float>& samples, float* const leftPtr, float* const rightPtr, const py::ssize_t nextStart) {
         const py::ssize_t offset = m_offsetMap[source];
-        if (nextStart >= offset && m_start < samples.size() + offset) {
+        if (nextStart > offset && m_start < samples.size() + offset) {
             const py::ssize_t sourceEnd = std::min(nextStart - offset, samples.size());
             const py::ssize_t sourceStart = std::max(m_start - offset, static_cast<py::ssize_t>(0));
             const py::ssize_t sourceSize = sourceEnd - sourceStart;
