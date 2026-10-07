@@ -355,8 +355,8 @@ PYBIND11_MODULE(py3dti, m)
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessVirtualAmbisonicReverb(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), &leftBuffer[0]};
-            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), &rightBuffer[0]};
+            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), leftBuffer.data()};
+            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), rightBuffer.data()};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CEnvironment& self) {
@@ -456,13 +456,13 @@ PYBIND11_MODULE(py3dti, m)
              }
          })
         .def("process_anechoic", [](CSingleSourceDSP& self, const py::array_t<float>& buffer) {
-            const CMonoBuffer<float> inputBuffer{buffer.data(), buffer.data()+buffer.size()};
+            const CMonoBuffer<float> inputBuffer{buffer.data(), buffer.data(buffer.size())};
             self.SetBuffer(inputBuffer);
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessAnechoic(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), &leftBuffer[0]};
-            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), &rightBuffer[0]};
+            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), leftBuffer.data()};
+            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), rightBuffer.data()};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CSingleSourceDSP& self) {
