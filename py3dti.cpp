@@ -26,11 +26,14 @@ typedef std::tuple<float,float,float> Position;
 typedef std::tuple<float,float,float,float> Orientation;
 typedef std::vector<Position> Positions;
 typedef std::vector<Orientation> Orientations;
-typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const py::array_t<float>> SourceSamplesMap;
+using MonoInput = py::array_t<float, py::array::c_style | py::array::forcecast>;
+using BinauralOutput = py::array_t<float, py::array::f_style>;
+using Size = py::ssize_t;
+typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const MonoInput> SourceSamplesMap;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Position> SourcePositionMap;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Positions> SourcePositionsMap;
 typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const double> SourceOffsetDurationMap;
-typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const py::ssize_t> SourceOffsetSamplesMap;
+typedef std::map<const std::shared_ptr<CSingleSourceDSP>, const Size> SourceOffsetSamplesMap;
 
 
 void updateTransform(CTransform &transform, const std::optional<Position>& position, const std::optional<Orientation>& orientation = std::nullopt)
@@ -99,7 +102,7 @@ public:
     }
 
 protected:
-    void processSourceSamples(const std::shared_ptr<CSingleSourceDSP>& source, const py::array_t<float>& samples, float* const leftPtr, float* const rightPtr, const py::ssize_t sourceStart, const py::ssize_t sourceSize)
+    void processSourceSamples(const std::shared_ptr<CSingleSourceDSP>& source, const MonoInput& samples, float* const leftPtr, float* const rightPtr, const Size sourceStart, const Size sourceSize)
     {
         const auto samplesMemory = samples.unchecked<1>();
         std::copy(samplesMemory.data(sourceStart), samplesMemory.data(sourceStart+sourceSize), m_inputBuffer.begin());
@@ -109,14 +112,14 @@ protected:
         addToOutput(sourceSize, leftPtr, rightPtr);
     }
 
-    void processEnvironments(const py::ssize_t size, float* const leftPtr, float* const rightPtr) {
+    void processEnvironments(const Size size, float* const leftPtr, float* const rightPtr) {
         for (const auto& environment : m_binauralRenderer->GetEnvironments()) {
             environment->ProcessVirtualAmbisonicReverb(m_leftBuffer, m_rightBuffer);
             addToOutput(size, leftPtr, rightPtr);
         }
     }
 
-    void addToOutput(const py::ssize_t size, float* const leftPtr, float* const rightPtr)
+    void addToOutput(const Size size, float* const leftPtr, float* const rightPtr)
     {
         std::transform(m_leftBuffer.begin(), m_leftBuffer.begin()+size, leftPtr, leftPtr, std::plus<float>());
         std::transform(m_rightBuffer.begin(), m_rightBuffer.begin()+size, rightPtr, rightPtr, std::plus<float>());
@@ -127,7 +130,7 @@ protected:
     CMonoBuffer<float> m_inputBuffer;
     CMonoBuffer<float> m_leftBuffer;
     CMonoBuffer<float> m_rightBuffer;
-    py::ssize_t m_start;
+    Size m_start;
 };
 
 class FiniteBinauralStreamer: public BinauralStreamer
@@ -140,10 +143,10 @@ public:
         if (samplesMap.empty()) {
             throw std::invalid_argument("At least one source with associated audio samples is required.");
         }
-        std::vector<py::ssize_t> sourceLengths;
+        std::vector<Size> sourceLengths;
         const int sampleRate = binauralRenderer->GetAudioState().sampleRate;
         for (const auto& [source, samples] : samplesMap) {
-            py::ssize_t offsetSamples = 0;
+            Size offsetSamples = 0;
             const auto& offsetItem = offsetMap.find(source);
             if (offsetItem != offsetMap.end()) {
                 offsetSamples = std::round(offsetItem->second * sampleRate);
@@ -159,18 +162,18 @@ public:
         return std::ceil(static_cast<double>(m_binauralLength) / m_bufferSize);
     }
 
-    py::array_t<float, py::array::f_style> operator()(const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
+    BinauralOutput operator()(const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
     {
         if (m_start >= m_binauralLength) {
             throw py::stop_iteration("All source samples have been processed.");
         }
-        py::array_t<float, py::array::f_style> binauralSamples({static_cast<py::ssize_t>(m_bufferSize), py::ssize_t(2)});
+        BinauralOutput binauralSamples({static_cast<Size>(m_bufferSize), Size(2)});
         binauralSamples[py::ellipsis()] = 0.f;
         auto binauralMem = binauralSamples.mutable_unchecked<2>();
         // Update listener position and orientation if given
         updateListenerPositionAndOrientation(m_binauralRenderer->GetListener(), listenerPosition, listenerOrientation);
         // Update sources
-        const py::ssize_t nextStart = m_start + m_bufferSize;
+        const Size nextStart = m_start + m_bufferSize;
         for (const auto& [source, samples] : m_samplesMap) {
             // Update source position if given
             updateSourcePosition(source, positionMap);
@@ -186,17 +189,17 @@ public:
 protected:
     using BinauralStreamer::processSourceSamples;
 
-    void processSourceSamples(const std::shared_ptr<CSingleSourceDSP>& source, const py::array_t<float>& samples, float* const leftPtr, float* const rightPtr, const py::ssize_t nextStart) {
-        const py::ssize_t offset = m_offsetMap[source];
+    void processSourceSamples(const std::shared_ptr<CSingleSourceDSP>& source, const MonoInput& samples, float* const leftPtr, float* const rightPtr, const Size nextStart) {
+        const Size offset = m_offsetMap[source];
         if (nextStart > offset && m_start < samples.size() + offset) {
-            const py::ssize_t sourceEnd = std::min(nextStart - offset, samples.size());
-            const py::ssize_t sourceStart = std::max(m_start - offset, static_cast<py::ssize_t>(0));
-            const py::ssize_t sourceSize = sourceEnd - sourceStart;
+            const Size sourceEnd = std::min(nextStart - offset, samples.size());
+            const Size sourceStart = std::max(m_start - offset, static_cast<Size>(0));
+            const Size sourceSize = sourceEnd - sourceStart;
             processSourceSamples(source, samples, leftPtr, rightPtr, sourceStart, sourceSize);
         }
     }
 
-    py::ssize_t m_binauralLength;
+    Size m_binauralLength;
 
 private:
     const SourceSamplesMap m_samplesMap;
@@ -208,7 +211,7 @@ class OfflineFiniteBinauralStreamer: public FiniteBinauralStreamer
 public:
     OfflineFiniteBinauralStreamer(const std::shared_ptr<CCore>& binauralRenderer, const SourceSamplesMap& samplesMap, const SourcePositionsMap& positionsMap = SourcePositionsMap(), const Positions& listenerPositions = Positions(), const Orientations& listenerOrientations = Orientations(), const SourceOffsetDurationMap& offsetMap = SourceOffsetDurationMap())
     : FiniteBinauralStreamer(binauralRenderer, samplesMap, offsetMap)
-    , m_binauralSamples({m_binauralLength, py::ssize_t(2)})
+    , m_binauralSamples({m_binauralLength, Size(2)})
     {
         m_binauralSamples[py::ellipsis()] = 0.f;
         auto binauralMem = m_binauralSamples.mutable_unchecked<2>();
@@ -216,7 +219,7 @@ public:
             // Update listener position and orientation if given
             updateListenerPositionAndOrientation(m_binauralRenderer->GetListener(), blockIdx, listenerPositions, listenerOrientations);
             // Update sources
-            const py::ssize_t nextStart = std::min(m_start + m_bufferSize, m_binauralLength);
+            const Size nextStart = std::min(m_start + m_bufferSize, m_binauralLength);
             for (const auto& [source, samples] : samplesMap) {
                 // Update source position if given
                 updateSourcePosition(source, blockIdx, positionsMap);
@@ -224,18 +227,18 @@ public:
                 processSourceSamples(source, samples, binauralMem.mutable_data(m_start, 0), binauralMem.mutable_data(m_start, 1), nextStart);
             }
             // Update environments
-            const py::ssize_t blockSize = nextStart - m_start;
+            const Size blockSize = nextStart - m_start;
             processEnvironments(blockSize, binauralMem.mutable_data(m_start, 0), binauralMem.mutable_data(m_start, 1));
         }
     }
 
-    const py::array_t<float, py::array::f_style>& operator()()
+    const BinauralOutput& operator()()
     {
         return m_binauralSamples;
     }
 
 private:
-    py::array_t<float, py::array::f_style> m_binauralSamples;
+    BinauralOutput m_binauralSamples;
 };
 
 class InfiniteBinauralStreamer: public BinauralStreamer
@@ -246,14 +249,14 @@ public:
     {
     }
 
-    py::array_t<float, py::array::f_style> operator()(const SourceSamplesMap& samplesMap, const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
+    BinauralOutput operator()(const SourceSamplesMap& samplesMap, const SourcePositionMap& positionMap, const std::optional<const Position>& listenerPosition = std::nullopt, const std::optional<const Orientation>& listenerOrientation = std::nullopt)
     {
         for (const auto& [source, samples] : samplesMap) {
             if (samples.size() > m_bufferSize) {
                 throw std::invalid_argument("The length of the source samples cannot be larger than the buffer size.");
             }
         }
-        py::array_t<float, py::array::f_style> binauralSamples({static_cast<py::ssize_t>(m_bufferSize), py::ssize_t(2)});
+        BinauralOutput binauralSamples({static_cast<Size>(m_bufferSize), Size(2)});
         binauralSamples[py::ellipsis()] = 0.f;
         auto binauralMem = binauralSamples.mutable_unchecked<2>();
         // Update listener position and orientation if given
@@ -265,7 +268,7 @@ public:
             // Process source samples if given
             if (samplesMap.find(source) != samplesMap.end()) {
                 const auto& samples = samplesMap.find(source)->second;
-                const py::ssize_t sourceSize = std::min(static_cast<py::ssize_t>(m_bufferSize), samples.size());
+                const Size sourceSize = std::min(static_cast<Size>(m_bufferSize), samples.size());
                 processSourceSamples(source, samples, binauralMem.mutable_data(0, 0), binauralMem.mutable_data(0, 1), sourceSize, sourceSize);
             }
         }
@@ -355,8 +358,8 @@ PYBIND11_MODULE(py3dti, m)
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessVirtualAmbisonicReverb(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), leftBuffer.data()};
-            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), rightBuffer.data()};
+            py::array_t<float> leftArray{static_cast<Size>(leftBuffer.size()), leftBuffer.data()};
+            py::array_t<float> rightArray{static_cast<Size>(rightBuffer.size()), rightBuffer.data()};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CEnvironment& self) {
@@ -455,14 +458,14 @@ PYBIND11_MODULE(py3dti, m)
                  self.DisableDistanceAttenuationReverb();
              }
          })
-        .def("process_anechoic", [](CSingleSourceDSP& self, const py::array_t<float>& buffer) {
+        .def("process_anechoic", [](CSingleSourceDSP& self, const MonoInput& buffer) {
             const CMonoBuffer<float> inputBuffer{buffer.data(), buffer.data(buffer.size())};
             self.SetBuffer(inputBuffer);
             CMonoBuffer<float> leftBuffer;
             CMonoBuffer<float> rightBuffer;
             self.ProcessAnechoic(leftBuffer, rightBuffer);
-            py::array_t<float> leftArray{static_cast<py::ssize_t>(leftBuffer.size()), leftBuffer.data()};
-            py::array_t<float> rightArray{static_cast<py::ssize_t>(rightBuffer.size()), rightBuffer.data()};
+            py::array_t<float> leftArray{static_cast<Size>(leftBuffer.size()), leftBuffer.data()};
+            py::array_t<float> rightArray{static_cast<Size>(rightBuffer.size()), rightBuffer.data()};
             return std::make_pair(leftArray, rightArray);
         })
         .def("__repr__", [](const CSingleSourceDSP& self) {
