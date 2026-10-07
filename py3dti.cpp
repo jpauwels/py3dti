@@ -337,6 +337,9 @@ PYBIND11_MODULE(py3dti, m)
             }
         })
         .def_property("ild_attenuation", &CListener::GetILDAttenuation, &CListener::SetILDAttenuation)
+        .def_property_readonly("hrir_length", [](const CListener& self) -> int32_t {
+            return self.GetHRTF()->GetHRIRLength();
+        })
         .def("load_hrtf_from_sofa", [](const std::shared_ptr<CListener>& self, const std::filesystem::path& sofaPath) {
             bool specifiedDelays;
             if (!HRTF::CreateFromSofa(sofaPath.string(), self, specifiedDelays)) {
@@ -358,7 +361,13 @@ PYBIND11_MODULE(py3dti, m)
             oss << "<py3dti.Listener (" << &self << ") at position " << self.GetListenerTransform().GetPosition() << " with orientation " << self.GetListenerTransform().GetOrientation();
             if (self.IsCustomizedITDEnabled()) {
                 oss.precision(4);
-                oss << " and a head radius of " << self.GetHeadRadius() << " m";
+                oss << ", a head radius of " << self.GetHeadRadius() << " m";
+            }
+            const int32_t hrirLength = self.GetHRTF()->GetHRIRLength();
+            if (hrirLength > 0) {
+                oss << " and an HRTF of length " << hrirLength;
+            } else {
+                oss << " and without HRTF";
             }
             oss << ">";
             return oss.str();
@@ -366,6 +375,9 @@ PYBIND11_MODULE(py3dti, m)
     ;
 
     py::class_<CEnvironment, std::shared_ptr<CEnvironment> >(m, "Environment")
+        .def_property_readonly("brir_length", [](const std::shared_ptr<CEnvironment>& self) -> int {
+            return self->GetBRIR()->GetBRIRLength();
+        })
         .def("load_brir_from_sofa", [](const std::shared_ptr<CEnvironment>& self, const std::filesystem::path& sofaPath) {
             if (!BRIR::CreateFromSofa(sofaPath.string(), self)) {
                 throw std::runtime_error("Loading BRIR from SOFA file failed.");
@@ -386,7 +398,14 @@ PYBIND11_MODULE(py3dti, m)
         })
         .def("__repr__", [](const CEnvironment& self) {
             std::ostringstream oss;
-            oss << "<py3dti.Environment (" << &self << ")>";
+            oss << "<py3dti.Environment (" << &self << ")";
+            const int brirLength = self.GetBRIR()->GetBRIRLength();
+            if (brirLength > 0) {
+                oss << " with a BRIR of length " << brirLength;
+            } else {
+                oss << " without BRIR";
+            }
+            oss << ">";
             return oss.str();
         })
     ;
