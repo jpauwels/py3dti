@@ -137,6 +137,9 @@ public:
     : BinauralStreamer(binauralRenderer)
     , m_samplesMap(samplesMap)
     {
+        if (samplesMap.empty()) {
+            throw std::invalid_argument("At least one source with associated audio samples is required.");
+        }
         std::vector<py::ssize_t> sourceLengths;
         const int sampleRate = binauralRenderer->GetAudioState().sampleRate;
         for (const auto& [source, samples] : samplesMap) {
