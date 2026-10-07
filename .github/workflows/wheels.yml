@@ -2,7 +2,6 @@ name: Wheels
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     branches:
      - main
@@ -19,7 +18,7 @@ jobs:
     name: Build SDist
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
 
@@ -29,8 +28,9 @@ jobs:
     - name: Check metadata
       run: pipx run twine check dist/*
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v6
       with:
+        name: sdist
         path: dist/*.tar.gz
 
 
@@ -40,22 +40,53 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-15-intel   # x86_64
+          - macos-14         # arm64
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
+  
+    - name: Create vcpkg binary cache directory
+      shell: bash
+      run: mkdir -p "${{ runner.temp }}/vcpkg-cache"
 
-    - uses: pypa/cibuildwheel@v2.15.0
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/vcpkg-cache
+        key: vcpkg-wheels-${{ matrix.os }}-${{ hashFiles('vcpkg.json', 'triplets/**') }}
+        restore-keys: vcpkg-wheels-${{ matrix.os }}-
+
+    - name: Set up vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: ${{ runner.temp }}/vcpkg
+        vcpkgGitCommitId: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+        binaryCachePath: ${{ runner.temp }}/vcpkg-cache
+
+    - uses: pypa/cibuildwheel@v4.3
+      env:
+        # Linux only: expose host vcpkg and its cache inside the manylinux container
+        CIBW_CONTAINER_ENGINE: >-
+          docker; create_args:
+          -v ${{ runner.temp }}/vcpkg:${{ runner.temp }}/vcpkg
+          -v ${{ runner.temp }}/vcpkg-cache:${{ runner.temp }}/vcpkg-cache
+        CIBW_ENVIRONMENT_PASS_LINUX: VCPKG_ROOT VCPKG_BINARY_SOURCES VCPKG_DEFAULT_BINARY_CACHE
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg-cache
 
     - name: Verify clean directory
       run: git diff --exit-code
       shell: bash
 
     - name: Upload wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
+        name: wheels-${{ matrix.os }}
         path: wheelhouse/*.whl
 
 
@@ -64,17 +95,15 @@ jobs:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
+    environment: pypi
+    permissions:
+      id-token: write   # only needed for trusted publishing, see notes
 
     steps:
-    - uses: actions/setup-python@v4
+    - uses: actions/download-artifact@v7
       with:
-        python-version: "3.x"
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: artifact
+        pattern: "{sdist,wheels-*}"
+        merge-multiple: true
         path: dist
 
-    - uses: pypa/gh-action-pypi-publish@release/v1.8
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    - uses: pypa/gh-action-pypi-publish@release/v1

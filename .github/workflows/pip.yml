@@ -2,7 +2,6 @@ name: Pip
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
@@ -18,20 +17,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.8", "3.12", "pypy-3.8"]
+        platform: [ubuntu-latest, windows-latest, macos-15-intel, macos-14]
+        python-version: ["3.11", "3.14", "pypy-3.11"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Create vcpkg binary cache directory
+      shell: bash
+      run: mkdir -p "${{ runner.temp }}/vcpkg-cache"
+
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/vcpkg-cache
+        key: vcpkg-pip-${{ matrix.platform }}-${{ hashFiles('vcpkg.json', 'triplets/**') }}
+        restore-keys: vcpkg-pip-${{ matrix.platform }}-
+
+    - name: Set up vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: ${{ runner.temp }}/vcpkg
+        vcpkgGitCommitId: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+        binaryCachePath: ${{ runner.temp }}/vcpkg-cache
+
     - name: Build and install
-      run: pip install --verbose .[test]
+      run: pip install --verbose ".[test]"
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     - name: Test
       run: pytest

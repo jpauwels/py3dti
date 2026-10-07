@@ -11,7 +11,7 @@ readme = "README.md"
 authors = [
   { name = "Johan Pauwels", email = "johan.pauwels@gmail.com" },
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 4 - Beta",
   "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
@@ -21,6 +21,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
 ]
+dependencies = ["numpy"]
 
 [project.optional-dependencies]
 test = ["pytest"]
@@ -28,7 +29,6 @@ test = ["pytest"]
 
 [tool.scikit-build]
 sdist.exclude = ["docs", "resources", "3dti_AudioToolkit/3dti_ResourceManager/third_party_libraries/sofacoustics/libsofa/lib"]
-wheel.expand-macos-universal-tags = true
 
 
 [tool.pytest.ini_options]
@@ -46,7 +46,15 @@ test-command = "pytest {project}/tests"
 test-extras = ["test"]
 
 [tool.cibuildwheel.macos]
-archs = ["x86_64"]
+archs = ["native"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
+before-all = [
+  "yum install -y zip unzip curl tar perl-IPC-Cmd pkgconfig",
+  "\"$VCPKG_ROOT/bootstrap-vcpkg.sh\" -disableMetrics",
+]
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
