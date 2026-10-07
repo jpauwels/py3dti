@@ -99,6 +99,17 @@ public:
     , m_rightBuffer(m_bufferSize)
     , m_start(0)
     {
+        const CHRTF* hrtf = binauralRenderer->GetListener()->GetHRTF();
+        if (hrtf->GetHRIRLength() == 0) {
+            throw std::runtime_error("No HRTF is loaded.");
+        }
+        const auto& environments = binauralRenderer->GetEnvironments();
+        for (size_t i = 0; i < environments.size(); ++i) {
+            const CBRIR* brir = environments[i]->GetBRIR();
+            if (brir->GetBRIRLength() == 0) {
+                throw std::runtime_error("No BRIR is loaded for environment " + std::to_string(i) + ".");
+            }
+        }
     }
 
 protected:
